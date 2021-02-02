@@ -1,0 +1,2 @@
+# ffmpeg_opengl_rendering
+使用ffmpeg+opengl进行音视频渲染
