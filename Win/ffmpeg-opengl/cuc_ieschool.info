@@ -1,0 +1,14 @@
+-------------------------AVFormatContext--------------------------
+ctx_flags = 0
+nb_streams = 2
+start_time = 0
+duration = 0
+bit_rate = 11210000
+packet_size = 0
+max_delay = 1618371
+flags = 0
+probesize = 0
+key = -1
+keylen = 2097152
+nb_programs = 5000000
+------------------------------------------------------------------
