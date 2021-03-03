@@ -1,0 +1,14 @@
+﻿  main.cpp
+D:\Workspace\cxx\ffmpeg_demo\depends\include\libavutil\rational.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(86,27): warning C4018: “<”: 有符号/无符号不匹配
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(88,39): warning C4996: 'AVStream::codec': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(102,53): warning C4996: 'AVStream::codec': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(137,28): warning C4996: 'avpicture_get_size': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(139,9): warning C4996: 'avpicture_fill': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(154,17): warning C4996: 'av_free_packet': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(163,23): warning C4996: 'avcodec_decode_video2': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(197,17): warning C4996: 'av_free_packet': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\FFVideoReader.h(206,23): warning C4996: 'avcodec_decode_video2': 被声明为已否决
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\main.cpp(73,34): warning C4474: sprintf: 格式字符串中传递的参数太多
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Project1\main.cpp(73,34): message : 占位符和其参数预计 0 可变参数，但提供的却是 1 参数
+  Project1.vcxproj -> D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\Debug\Project1.exe

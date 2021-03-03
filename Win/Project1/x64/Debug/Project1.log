@@ -1,0 +1,26 @@
+﻿main.obj : error LNK2019: 无法解析的外部符号 av_malloc，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 av_free，函数 "public: __cdecl FFVideoReader::~FFVideoReader(void)" (??1FFVideoReader@@QEAA@XZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 sws_freeContext，函数 "public: __cdecl FFVideoReader::~FFVideoReader(void)" (??1FFVideoReader@@QEAA@XZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 sws_getContext，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 sws_scale，函数 "public: void * __cdecl FFVideoReader::readFrame(void)" (?readFrame@FFVideoReader@@QEAAPEAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 av_frame_alloc，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avcodec_open2，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avcodec_close，函数 "public: __cdecl FFVideoReader::~FFVideoReader(void)" (??1FFVideoReader@@QEAA@XZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 av_init_packet，函数 "public: void * __cdecl FFVideoReader::readFrame(void)" (?readFrame@FFVideoReader@@QEAAPEAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 av_free_packet，函数 "public: void * __cdecl FFVideoReader::readFrame(void)" (?readFrame@FFVideoReader@@QEAAPEAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 av_packet_unref，函数 "public: void * __cdecl FFVideoReader::readFrame(void)" (?readFrame@FFVideoReader@@QEAAPEAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avcodec_find_decoder，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avcodec_decode_video2，函数 "public: void * __cdecl FFVideoReader::readFrame(void)" (?readFrame@FFVideoReader@@QEAAPEAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avpicture_fill，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avpicture_get_size，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 av_register_all，函数 "public: void __cdecl FFVideoReader::setup(void)" (?setup@FFVideoReader@@QEAAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avformat_alloc_context，函数 "public: void __cdecl FFVideoReader::setup(void)" (?setup@FFVideoReader@@QEAAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avformat_open_input，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avformat_find_stream_info，函数 "public: int __cdecl FFVideoReader::load(char const *)" (?load@FFVideoReader@@QEAAHPEBD@Z) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 av_read_frame，函数 "public: void * __cdecl FFVideoReader::readFrame(void)" (?readFrame@FFVideoReader@@QEAAPEAXXZ) 中引用了该符号
+main.obj : error LNK2019: 无法解析的外部符号 avformat_close_input，函数 "public: __cdecl FFVideoReader::~FFVideoReader(void)" (??1FFVideoReader@@QEAA@XZ) 中引用了该符号
+D:\Workspace\cxx\ffmpeg_demo\depends\lib\avcodec.lib : warning LNK4272: 库计算机类型“x86”与目标计算机类型“x64”冲突
+D:\Workspace\cxx\ffmpeg_demo\depends\lib\avutil.lib : warning LNK4272: 库计算机类型“x86”与目标计算机类型“x64”冲突
+D:\Workspace\cxx\ffmpeg_demo\depends\lib\avformat.lib : warning LNK4272: 库计算机类型“x86”与目标计算机类型“x64”冲突
+D:\Workspace\cxx\ffmpeg_demo\depends\lib\swscale.lib : warning LNK4272: 库计算机类型“x86”与目标计算机类型“x64”冲突
+D:\Workspace\cxx\ffmpeg_demo\ffmpeg_opengl_rendering\Win\x64\Debug\Project1.exe : fatal error LNK1120: 21 个无法解析的外部命令
