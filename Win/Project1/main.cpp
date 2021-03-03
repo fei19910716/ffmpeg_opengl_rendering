@@ -17,12 +17,17 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 {
     switch (msg)
     {
-    case WM_PAINT:
+    case WM_PAINT:// draw
     {
         PAINTSTRUCT ps;
         HDC         hdc;
         hdc = BeginPaint(hWnd, &ps);
-        BitBlt(hdc, 0, 0, g_reader._screenW, g_reader._screenH, g_hMem, 0, 0, SRCCOPY);
+        if (g_hMem)
+        {
+            BITMAPINFO  bmpInfor;
+            GetObject(g_hBmp, sizeof(bmpInfor), &bmpInfor);
+            BitBlt(hdc, 0, 0, bmpInfor.bmiHeader.biWidth, bmpInfor.bmiHeader.biHeight, g_hMem, 0, 0, SRCCOPY);
+        }
         EndPaint(hWnd, &ps);
     }
     break;
@@ -30,13 +35,16 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
         break;
     case WM_CLOSE:
     case WM_DESTROY:
+        g_decode.exitThread();
         PostQuitMessage(0);
         break;
-    case WM_TIMER:
+    case WM_UPDATE_VIDEO: // message from the decode thread
     {
-        BYTE* data = (BYTE*)g_reader.readFrame();
-        if (!data) break;
-        for (int i = 0; i < g_reader._screenW * g_reader._screenH * 3; i += 3)
+        FrameInfor* infor = (FrameInfor*)wParam;
+        memcpy(g_imageBuf, infor->_data, infor->_dataSize); // get the frame data
+
+        BYTE* data = (BYTE*)infor->_data;
+        for (int i = 0; i < infor->_dataSize; i += 3)
         {
             g_imageBuf[i + 0] = data[i + 2];
             g_imageBuf[i + 1] = data[i + 1];
@@ -51,7 +59,7 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 
     return  DefWindowProc(hWnd, msg, wParam, lParam);
 }
-
+// get the path of .exe
 void  getResourcePath(HINSTANCE hInstance, char pPath[1024])
 {
     char    szPathName[1024];
@@ -71,10 +79,9 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     getResourcePath(hInstance, szPath);
 
     sprintf(szPathName, "1.mp4", szPath);
-    g_reader.setup();
-    g_reader.load(szPathName);
+    g_decode.load(szPathName); // load the video
 
-    //  1   ע�ᴰ����
+    //  register window class
     ::WNDCLASSEXA winClass;
     winClass.lpszClassName = "FFVideoPlayer";
     winClass.cbSize = sizeof(::WNDCLASSEX);
@@ -90,7 +97,7 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     winClass.cbWndExtra = 0;
     RegisterClassExA(&winClass);
 
-    //  2 ��������
+    //  create window
     HWND    hWnd = CreateWindowEx(
         NULL,
         L"FFVideoPlayer",
@@ -98,24 +105,25 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         0,
         0,
-        g_reader._screenW,
-        g_reader._screenH,
+        g_decode._ffReader._screenW,
+        g_decode._ffReader._screenH,
         0,
         0,
         hInstance,
         0
     );
+    g_decode._hWnd = hWnd; // set the window to send message
 
     UpdateWindow(hWnd);
     ShowWindow(hWnd, SW_SHOW);
 
-    HDC     hDC = GetDC(hWnd);
-    g_hMem = ::CreateCompatibleDC(hDC);
+    HDC     hDC = GetDC(hWnd); 
+    g_hMem = ::CreateCompatibleDC(hDC); // 创建画板
 
-    BITMAPINFO	bmpInfor = { 0 };
+    BITMAPINFO	bmpInfor = { 0 }; 
     bmpInfor.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmpInfor.bmiHeader.biWidth = g_reader._screenW;
-    bmpInfor.bmiHeader.biHeight = -g_reader._screenH;
+    bmpInfor.bmiHeader.biWidth = g_decode._ffReader._screenW;
+    bmpInfor.bmiHeader.biHeight = -g_decode._ffReader._screenH;
     bmpInfor.bmiHeader.biPlanes = 1;
     bmpInfor.bmiHeader.biBitCount = 24;
     bmpInfor.bmiHeader.biCompression = BI_RGB;
@@ -125,10 +133,10 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     bmpInfor.bmiHeader.biClrUsed = 0;
     bmpInfor.bmiHeader.biClrImportant = 0;
 
-    g_hBmp = CreateDIBSection(hDC, &bmpInfor, DIB_RGB_COLORS, (void**)&g_imageBuf, 0, 0);
+    g_hBmp = CreateDIBSection(hDC, &bmpInfor, DIB_RGB_COLORS, (void**)&g_imageBuf, 0, 0); // 创建画布，并指定数据源
     SelectObject(g_hMem, g_hBmp);
 
-    SetTimer(hWnd, 1, 40, 0);
+    g_decode.start(); // start the thread
 
     MSG     msg = { 0 };
     while (GetMessage(&msg, NULL, 0, 0))

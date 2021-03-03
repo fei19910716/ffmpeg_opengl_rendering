@@ -12,7 +12,7 @@ public:
 protected:
 
     /**
-    *   �߳���ں���
+    *   callback of thread
     */
     static  DWORD    CALLBACK threadEnter(void* pVoid)
     {
@@ -39,7 +39,7 @@ public:
         return  true;
     }
     /**
-    *   �����̺߳���
+    *   start the thread
     */
     virtual bool    start()
     {
@@ -49,19 +49,19 @@ public:
         }
         else
         {
-            //HIGH_PRIORITY_CLASS
+            //HIGH_PRIORITY_CLASS: create a thread, set the callback function
             _thread = CreateThread(0, 0, &Thread::threadEnter, this, 0, &_threadId);
             return  true;
         }
     }
     /**
-    *   �ȴ��˳�����
+    *   stop a thread, block the main thread
     */
     virtual void    join()
     {
         if (_thread)
         {
-            WaitForSingleObject(_thread, 0xFFFFFFFF);
+            WaitForSingleObject(_thread, 0xFFFFFFFF);// waite the thread to stop
             CloseHandle(_thread);
             _thread = 0;
         }
@@ -90,14 +90,14 @@ public:
         join();
     }
     /**
-    *   �����ļ�
+    *   load the video
     */
     virtual void    load(const char* fileName)
     {
         _ffReader.load(fileName);
     }
     /**
-    *   �߳�ִ�к���
+    *   actual task of decode thread
     */
     virtual bool    run()
     {
@@ -108,7 +108,7 @@ public:
             {
                 break;
             }
-            //! ������Ҫ֪ͨ���ڽ����ػ��Ƹ��£���ʾ��������
+            //! 同步发送消息，等待返回；异步发送消息用：postMessage
             SendMessage(_hWnd, WM_UPDATE_VIDEO, (WPARAM)&infor, 0);
         }
 

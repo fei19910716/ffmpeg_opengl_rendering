@@ -11,10 +11,10 @@ extern "C"
 #include <libavformat/avio.h>
 #include <libavutil/file.h>
 }
-
+// 封装一帧数据
 struct  FrameInfor
 {
-    void* _data;
+    void*   _data;
     int     _dataSize;
     int     _width;
     int     _height;
@@ -185,7 +185,7 @@ public:
         }
         return  0;
     }
-
+    // 读取一帧信息到frameInfo中
     bool    readFrame(FrameInfor& infor)
     {
         AVPacket packet;
