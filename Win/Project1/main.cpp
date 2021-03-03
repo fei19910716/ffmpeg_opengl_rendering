@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <tchar.h>
+#include <iostream>
 
 #include "FFVideoReader.h"
 #include "Thread.h"
@@ -40,6 +41,8 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
         break;
     case WM_UPDATE_VIDEO: // message from the decode thread
     {
+        // 非常重要，这里不能用智能指针，否则会crash
+        //std::shared_ptr<FrameInfor> infor((FrameInfor*)wParam);
         FrameInfor* infor = (FrameInfor*)wParam;
         memcpy(g_imageBuf, infor->_data, infor->_dataSize); // get the frame data
 
@@ -72,6 +75,7 @@ void  getResourcePath(HINSTANCE hInstance, char pPath[1024])
 
 int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
+    AllocConsole(); freopen("CONOUT$", "r+", stdout);
     // ffmpeg 
     char    szPath[1024];
     char    szPathName[1024];

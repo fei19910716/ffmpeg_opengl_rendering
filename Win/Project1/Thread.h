@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <windows.h>
+#include <memory>
 
 #define WM_UPDATE_VIDEO WM_USER + 100
 
@@ -103,13 +104,15 @@ public:
     {
         while (!_exitFlag)
         {
-            FrameInfor  infor;
-            if (!_ffReader.readFrame(infor))
+            // 非常重要，这里不能用智能指针，否则会crash
+            //std::shared_ptr<FrameInfor> infor = std::make_shared<FrameInfor>();
+            FrameInfor* infor = new FrameInfor;
+            if (!_ffReader.readFrame(*infor))
             {
                 break;
             }
             //! 同步发送消息，等待返回；异步发送消息用：postMessage
-            SendMessage(_hWnd, WM_UPDATE_VIDEO, (WPARAM)&infor, 0);
+            PostMessage(_hWnd, WM_UPDATE_VIDEO, (WPARAM)infor, 0);
         }
 
         return  true;
