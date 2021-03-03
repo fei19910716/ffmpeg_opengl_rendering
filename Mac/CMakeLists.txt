@@ -25,6 +25,7 @@ find_package(Qt5Concurrent REQUIRED)
 find_package(Qt5 COMPONENTS Svg REQUIRED)
 
 include_directories(${QT_LOCAL_PATH}/clang_64/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/3rdParty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/ffmpeg/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/ffmpeg/include/movie)
 

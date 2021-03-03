@@ -81,10 +81,10 @@ VideoDecoder::~VideoDecoder() {
 
 static inline void flipFrame(AVFrame *pFrame) {
   pFrame->data[0] += pFrame->linesize[0] * (pFrame->height - 1);
-  pFrame->linesize[0] *= -1;
-  pFrame->data[1] += pFrame->linesize[1] * (pFrame->height / 2 - 1);
-  pFrame->linesize[1] *= -1;
-  pFrame->data[2] += pFrame->linesize[2] * (pFrame->height / 2 - 1);
+    pFrame->linesize[0] *= -1;
+    pFrame->data[1] += pFrame->linesize[1] * (pFrame->height / 2 - 1);
+    pFrame->linesize[1] *= -1;
+    pFrame->data[2] += pFrame->linesize[2] * (pFrame->height / 2 - 1);
   pFrame->linesize[2] *= -1;
 }
 
