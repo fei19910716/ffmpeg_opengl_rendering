@@ -18,52 +18,75 @@ class   DecodeThread :public Thread
 public:
     FFVideoReader   _ffReader;
     HWND            _hWnd;
+    BYTE* _imageBuf;
+    HDC             _hMem;
+    HBITMAP	        _hBmp;
     bool            _exitFlag;
 public:
     DecodeThread()
     {
-        _ffReader.setup();
-        _hWnd = 0;
         _exitFlag = false;
+        _hWnd = 0;
     }
 
-    void    exitThread()
+    virtual void    setup(HWND hwnd, const char* fileName)
     {
-        _exitFlag = true;
-        join();
+        _hWnd = hwnd;
+
+        HDC     hDC = GetDC(hwnd);
+        _hMem = ::CreateCompatibleDC(hDC);
+
+
+        BITMAPINFO	bmpInfor;
+        bmpInfor.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmpInfor.bmiHeader.biWidth = _ffReader._screenW;
+        bmpInfor.bmiHeader.biHeight = -_ffReader._screenH;
+        bmpInfor.bmiHeader.biPlanes = 1;
+        bmpInfor.bmiHeader.biBitCount = 24;
+        bmpInfor.bmiHeader.biCompression = BI_RGB;
+        bmpInfor.bmiHeader.biSizeImage = 0;
+        bmpInfor.bmiHeader.biXPelsPerMeter = 0;
+        bmpInfor.bmiHeader.biYPelsPerMeter = 0;
+        bmpInfor.bmiHeader.biClrUsed = 0;
+        bmpInfor.bmiHeader.biClrImportant = 0;
+
+        _hBmp = CreateDIBSection(hDC, &bmpInfor, DIB_RGB_COLORS, (void**)&_imageBuf, 0, 0);
+        SelectObject(_hMem, _hBmp);
     }
     /**
-    *   load the video
+    *   �����ļ�
     */
     virtual void    load(const char* fileName)
     {
+        _ffReader.setup();
         _ffReader.load(fileName);
     }
+    virtual void    join()
+    {
+        _exitFlag = true;
+        Thread::join();
+    }
     /**
-    *   actual task of decode thread
+    *   �߳�ִ�к���
     */
     virtual bool    run()
     {
         while (!_exitFlag)
         {
-            // 非常重要，这里不能用智能指针，否则会crash
-            //std::shared_ptr<FrameInfor> infor = std::make_shared<FrameInfor>();
-            FrameInfor infor;
+            FrameInfor  infor;
             if (!_ffReader.readFrame(infor))
             {
                 break;
             }
-            // 先进行耗时操作：数据的拷贝，尽可能避免主线程读到脏数据
+
             BYTE* data = (BYTE*)infor._data;
             for (int i = 0; i < infor._dataSize; i += 3)
             {
-                g_imageBuf[i + 0] = data[i + 2];
-                g_imageBuf[i + 1] = data[i + 1];
-                g_imageBuf[i + 2] = data[i + 0];
+                _imageBuf[i + 0] = data[i + 2];
+                _imageBuf[i + 1] = data[i + 1];
+                _imageBuf[i + 2] = data[i + 0];
             }
             InvalidateRect(_hWnd, 0, 0);
-
-            // 方案三：new g_imageBuf存储数据，则不涉及多线程操作同一块内存
         }
 
         return  true;
@@ -80,11 +103,11 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
         PAINTSTRUCT ps;
         HDC         hdc;
         hdc = BeginPaint(hWnd, &ps);
-        if (g_hMem)
+        if (g_decode._hMem)
         {
             BITMAPINFO  bmpInfor;
-            GetObject(g_hBmp, sizeof(bmpInfor), &bmpInfor);
-            BitBlt(hdc, 0, 0, bmpInfor.bmiHeader.biWidth, bmpInfor.bmiHeader.biHeight, g_hMem, 0, 0, SRCCOPY);
+            GetObject(g_decode._hBmp, sizeof(bmpInfor), &bmpInfor);
+            BitBlt(hdc, 0, 0, bmpInfor.bmiHeader.biWidth, bmpInfor.bmiHeader.biHeight, g_decode._hMem, 0, 0, SRCCOPY);
         }
         EndPaint(hWnd, &ps);
     }
@@ -93,7 +116,7 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
         break;
     case WM_CLOSE:
     case WM_DESTROY:
-        g_decode.exitThread();
+        g_decode.join();
         PostQuitMessage(0);
         break;
     case WM_UPDATE_VIDEO: // message from the decode thread
@@ -173,31 +196,12 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         hInstance,
         0
     );
-    g_decode._hWnd = hWnd; // set the window to send message
 
     UpdateWindow(hWnd);
     ShowWindow(hWnd, SW_SHOW);
 
-    HDC     hDC = GetDC(hWnd); 
-    g_hMem = ::CreateCompatibleDC(hDC); // 创建画板
-
-    BITMAPINFO	bmpInfor = { 0 }; 
-    bmpInfor.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmpInfor.bmiHeader.biWidth = g_decode._ffReader._screenW;
-    bmpInfor.bmiHeader.biHeight = -g_decode._ffReader._screenH;
-    bmpInfor.bmiHeader.biPlanes = 1;
-    bmpInfor.bmiHeader.biBitCount = 24;
-    bmpInfor.bmiHeader.biCompression = BI_RGB;
-    bmpInfor.bmiHeader.biSizeImage = 0;
-    bmpInfor.bmiHeader.biXPelsPerMeter = 0;
-    bmpInfor.bmiHeader.biYPelsPerMeter = 0;
-    bmpInfor.bmiHeader.biClrUsed = 0;
-    bmpInfor.bmiHeader.biClrImportant = 0;
-
-    g_hBmp = CreateDIBSection(hDC, &bmpInfor, DIB_RGB_COLORS, (void**)&g_imageBuf, 0, 0); // 创建画布，并指定数据源
-    SelectObject(g_hMem, g_hBmp);
-
-    g_decode.start(); // start the thread
+    g_decode.setup(hWnd, szPathName);
+    g_decode.start();
 
     MSG     msg = { 0 };
     while (GetMessage(&msg, NULL, 0, 0))
