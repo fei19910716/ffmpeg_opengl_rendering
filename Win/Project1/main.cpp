@@ -7,12 +7,69 @@
 #include "FFVideoReader.h"
 #include "Thread.h"
 
-DecodeThread    g_decode;
 
 HBITMAP         g_hBmp = 0;
 HDC             g_hMem = 0;
 BYTE* g_imageBuf = 0;
 FFVideoReader   g_reader;
+
+class   DecodeThread :public Thread
+{
+public:
+    FFVideoReader   _ffReader;
+    HWND            _hWnd;
+    bool            _exitFlag;
+public:
+    DecodeThread()
+    {
+        _ffReader.setup();
+        _hWnd = 0;
+        _exitFlag = false;
+    }
+
+    void    exitThread()
+    {
+        _exitFlag = true;
+        join();
+    }
+    /**
+    *   load the video
+    */
+    virtual void    load(const char* fileName)
+    {
+        _ffReader.load(fileName);
+    }
+    /**
+    *   actual task of decode thread
+    */
+    virtual bool    run()
+    {
+        while (!_exitFlag)
+        {
+            // 非常重要，这里不能用智能指针，否则会crash
+            //std::shared_ptr<FrameInfor> infor = std::make_shared<FrameInfor>();
+            FrameInfor infor;
+            if (!_ffReader.readFrame(infor))
+            {
+                break;
+            }
+            // 先进行耗时操作：数据的拷贝，尽可能避免主线程读到脏数据
+            BYTE* data = (BYTE*)infor._data;
+            for (int i = 0; i < infor._dataSize; i += 3)
+            {
+                g_imageBuf[i + 0] = data[i + 2];
+                g_imageBuf[i + 1] = data[i + 1];
+                g_imageBuf[i + 2] = data[i + 0];
+            }
+            InvalidateRect(_hWnd, 0, 0);
+
+            // 方案三：new g_imageBuf存储数据，则不涉及多线程操作同一块内存
+        }
+
+        return  true;
+    }
+};
+DecodeThread    g_decode;
 
 LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
