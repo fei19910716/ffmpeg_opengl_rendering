@@ -6,6 +6,7 @@
 
 #include "FFVideoReader.h"
 #include "Thread.h"
+#include "Timestamp.h"
 
 
 HBITMAP         g_hBmp = 0;
@@ -22,6 +23,7 @@ public:
     HDC             _hMem;
     HBITMAP	        _hBmp;
     bool            _exitFlag;
+    Timestamp       _timestamp;
 public:
     DecodeThread()
     {
@@ -71,6 +73,7 @@ public:
     */
     virtual bool    run()
     {
+        _timestamp.update();
         while (!_exitFlag)
         {
             FrameInfor  infor;
@@ -78,7 +81,7 @@ public:
             {
                 break;
             }
-
+            double      tims = infor._pts * infor._timeBase * 1000; //获取数据帧中的播放时间点
             BYTE* data = (BYTE*)infor._data;
             for (int i = 0; i < infor._dataSize; i += 3)
             {
@@ -87,6 +90,12 @@ public:
                 _imageBuf[i + 2] = data[i + 0];
             }
             InvalidateRect(_hWnd, 0, 0);
+            double      elsped = _timestamp.getElapsedTimeInMilliSec(); // 流逝的时间
+            double      sleeps = (tims - elsped); // 如果流逝的时间还没到播放时间点，则应该等待
+            if (sleeps > 1)
+            {
+                Sleep((DWORD)sleeps);
+            }
         }
 
         return  true;
@@ -184,8 +193,8 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     //  create window
     HWND    hWnd = CreateWindowEx(
         NULL,
-        L"FFVideoPlayer",
-        L"FFVideoPlayer",
+        "FFVideoPlayer",
+        "FFVideoPlayer",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
         0,
         0,
