@@ -7,6 +7,7 @@
 #include "FFVideoReader.h"
 #include "Thread.h"
 #include "Timestamp.h"
+#include "GLContext.h"
 
 
 HBITMAP         g_hBmp = 0;
@@ -102,6 +103,7 @@ public:
     }
 };
 DecodeThread    g_decode;
+GLContext       g_glContext;
 
 LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -109,16 +111,10 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
     {
     case WM_PAINT:// draw
     {
-        PAINTSTRUCT ps;
-        HDC         hdc;
-        hdc = BeginPaint(hWnd, &ps);
-        if (g_decode._hMem)
-        {
-            BITMAPINFO  bmpInfor;
-            GetObject(g_decode._hBmp, sizeof(bmpInfor), &bmpInfor);
-            BitBlt(hdc, 0, 0, bmpInfor.bmiHeader.biWidth, bmpInfor.bmiHeader.biHeight, g_decode._hMem, 0, 0, SRCCOPY);
-        }
-        EndPaint(hWnd, &ps);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glClearColor(1, 0, 0, 1);
+
+        g_glContext.swapBuffer();
     }
     break;
     case WM_SIZE:
@@ -206,6 +202,8 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         0
     );
 
+    g_glContext.setup(hWnd, GetDC(hWnd));
+
     UpdateWindow(hWnd);
     ShowWindow(hWnd, SW_SHOW);
 
@@ -218,6 +216,6 @@ int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
+    g_glContext.shutdown();
     return  0;
 }
