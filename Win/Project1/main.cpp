@@ -4,10 +4,15 @@
 #include <tchar.h>
 #include <iostream>
 
+#include "glew/glew.h"
 #include "FFVideoReader.h"
 #include "Thread.h"
 #include "Timestamp.h"
 #include "GLContext.h"
+#include "CELLShader.h"
+#include "CELLMath.h"
+
+
 
 
 HBITMAP         g_hBmp = 0;
@@ -25,6 +30,7 @@ public:
     Timestamp       _timestamp;
     GLContext       _glContext;
     unsigned        _textureId;
+    PROGRAM_P2_UV2  _shaderTex;
 public:
     DecodeThread()
     {
@@ -32,15 +38,19 @@ public:
         _hWnd = 0;
     }
 
-    virtual void    setup(HWND hwnd, const char* fileName)
+    virtual void    setup(HWND hwnd, const char* fileName = "11.flv")
     {
         _hWnd = hwnd;
         
         _glContext.setup(hwnd, GetDC(hwnd));
 
+        glewInit();
+
         glEnable(GL_TEXTURE_2D);
 
         _textureId = createTexture(_ffReader._screenW, _ffReader._screenH);
+
+        _shaderTex.initialize();
 
     }
     /**
@@ -130,16 +140,18 @@ public:
             {   w,  0,  1,  0},
             {   w,  h,  1,  1},
         };
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-        glVertexPointer(2, GL_FLOAT, sizeof(Vertex), &vertexs[0].x);
-        glTexCoordPointer(2, GL_FLOAT, sizeof(Vertex), &vertexs[0].u);
+        CELL::matrix4   matMVP = CELL::ortho<float>(0, w, h, 0, -100, 100);
+        _shaderTex.begin();
+        glUniformMatrix4fv(_shaderTex._MVP, 1, GL_FALSE, matMVP.data());
 
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        glDisableClientState(GL_VERTEX_ARRAY);
-        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+        glUniform1i(_shaderTex._texture, 0);
+        {
+            glVertexAttribPointer(_shaderTex._position, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), &vertexs[0].x);
+            glVertexAttribPointer(_shaderTex._uv, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), &vertexs[0].u);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+        _shaderTex.end();
 
         _glContext.swapBuffer();
     }
