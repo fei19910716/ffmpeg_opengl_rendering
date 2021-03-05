@@ -14,7 +14,6 @@
 
 
 
-
 HBITMAP         g_hBmp = 0;
 HDC             g_hMem = 0;
 BYTE*           g_imageBuf = 0;
@@ -31,11 +30,13 @@ public:
     GLContext       _glContext;
     unsigned        _textureYUV;
     PROGRAM_YUV_SingleTexture     _shaderTex;
+    unsigned        _pbo;
 public:
     DecodeThread()
     {
         _exitFlag = false;
         _hWnd = 0;
+        _pbo = 0;
     }
 
     virtual void    setup(HWND hwnd, const char* fileName = "11.flv")
@@ -49,6 +50,8 @@ public:
         glEnable(GL_TEXTURE_2D);
         // 创建单通道纹理，由于UV长宽是原图的一半，因此拼接起来的纹理尺寸为w，h+h/2
         _textureYUV = createTexture(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2); 
+
+        _pbo = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
 
         _shaderTex.initialize();
 
@@ -97,16 +100,46 @@ public:
         return  true;
     }
 
+    void    updateImage(GLubyte* dst, int x, int y, int w, int h, void* data)
+    {
+        int      pitch = _ffReader._screenW;
+        GLubyte*  dst1 = dst + y * pitch + x;
+        GLubyte*   src = (GLubyte*)(data);
+
+        int         size = w;
+
+        for (int i = 0; i < h; ++i)
+        {
+            memcpy(dst1, src, w);
+            dst1 += pitch;
+            src += w;
+        }
+    }
+
     void    updateTexture(FrameInfor* infor)
     {
-        glBindTexture(GL_TEXTURE_2D, _textureYUV); // 执行cpu 到 gpu的纹理数据拷贝
+        int     w = _ffReader._screenW;
+        int     h = _ffReader._screenH + _ffReader._screenH / 2;
 
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW, _ffReader._screenH, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[0]);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo); // 绑定pbo
+        GLubyte* dst = (GLubyte*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY); // 获取pbo 内存指针
 
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[1]);
+        if (dst != 0) // 内存中进行纹理数据拷贝到pbo中
+        {
+            memcpy(dst, infor->_data->data[0], _ffReader._screenW * _ffReader._screenH);
 
-        glTexSubImage2D(GL_TEXTURE_2D, 0, _ffReader._screenW / 2, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[2]);
+            updateImage(dst, 0, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, infor->_data->data[1]);
+            updateImage(dst, _ffReader._screenW / 2, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, infor->_data->data[2]);
 
+            glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+        }
+
+        glBindTexture(GL_TEXTURE_2D, _textureYUV);
+
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_ALPHA, GL_UNSIGNED_BYTE, 0); // pbo 中的数据拷贝到显存
+
+
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     }
 
@@ -198,6 +231,16 @@ protected:
         return  texId;
     }
 
+    unsigned    createPBuffer(int w, int h)
+    {
+        unsigned    pbuffer = 0;
+        glGenBuffers(1, &pbuffer);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbuffer);
+        glBufferData(GL_PIXEL_UNPACK_BUFFER, w * h, 0, GL_STREAM_DRAW);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+        return  pbuffer;
+    }
 };
 DecodeThread    g_decode;
 GLContext       g_glContext;
