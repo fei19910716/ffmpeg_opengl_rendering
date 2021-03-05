@@ -4,6 +4,8 @@
 #include <tchar.h>
 #include <iostream>
 
+#include <mutex>
+
 #include "glew/glew.h"
 #include "FFVideoReader.h"
 #include "Thread.h"
@@ -18,6 +20,7 @@ HBITMAP         g_hBmp = 0;
 HDC             g_hMem = 0;
 BYTE*           g_imageBuf = 0;
 FFVideoReader   g_reader;
+std::mutex      g_lock;
 
 class   DecodeThread :public Thread
 {
@@ -85,9 +88,12 @@ public:
         while (!_exitFlag)
         {
             FrameInfor* infor = new FrameInfor();
-            if (!_ffReader.readFrame(*infor))
             {
-                break;
+                std::lock_guard<std::mutex> locker(g_lock); 
+                if (!_ffReader.readFrame(*infor))
+                {
+                    break;
+                }
             }
             double      tims = infor->_pts * infor->_timeBase * 1000;
             //! ������Ҫ֪ͨ���ڽ����ػ��Ƹ��£���ʾ��������
@@ -274,9 +280,12 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
     case WM_UPDATE_VIDEO: // message from the decode thread
     {
         // 非常重要，这里不能用智能指针，否则会crash
-        //std::shared_ptr<FrameInfor> infor((FrameInfor*)wParam);
+        // std::shared_ptr<FrameInfor> infor((FrameInfor*)wParam);
         FrameInfor* infor = (FrameInfor*)wParam;
-        g_decode.updateTexture(infor);
+        {
+            std::lock_guard<std::mutex> locker(g_lock);
+            g_decode.updateTexture(infor);
+        }
         delete  infor;
         g_decode.render();
     }
