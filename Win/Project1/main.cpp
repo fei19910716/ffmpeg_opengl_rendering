@@ -74,12 +74,15 @@ public:
 
         _textureYUV = createTexture(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
 
+        _pbo[0] = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
+        _pbo[1] = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
+
         char    szPath[1024];
         char    szPathName[1024];
 
         getResourcePath(0, szPath);
 
-        sprintf(szPathName, "test.bmp", szPath);
+        sprintf(szPathName, "photo.png", szPath);
 
         _textureRGB = createTextureFromImage(szPathName);
 
@@ -313,7 +316,7 @@ protected:
             pixels[i + 2] = temp;
         }
 
-        unsigned    res = createTexture(width, height, GL_RGB, pixels);
+        unsigned    res = createTexture(width, height, GL_RGBA, pixels);
         FreeImage_Unload(dib);
         return      res;
     }
