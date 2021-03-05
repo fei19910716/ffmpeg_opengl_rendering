@@ -439,3 +439,125 @@ public:
     }
 };
 
+class   PROGRAM_YUV1_RGB :public ProgramId
+{
+public:
+    typedef int attribute;
+    typedef int uniform;
+public:
+    attribute   _position;
+    attribute   _uvY;
+    attribute   _uvU;
+    attribute   _uvV;
+    uniform     _MVP;
+    uniform     _textureYUV;
+    uniform     _textureRGB;
+    uniform     _contrl;
+
+public:
+    PROGRAM_YUV1_RGB()
+    {
+        _position = -1;
+        _uvY = -1;
+        _uvU = -1;
+        _uvV = -1;
+        _MVP = -1;
+        _textureYUV = -1;
+    }
+    ~PROGRAM_YUV1_RGB()
+    {
+    }
+
+    /// ��ʼ������
+    virtual bool    initialize()
+    {
+        const char* vs =
+        {
+            "precision lowp float; "
+            "uniform   mat4 _MVP;"
+            "attribute vec2 _position;"
+            "attribute vec2 _uvY;"
+            "attribute vec2 _uvU;"
+            "attribute vec2 _uvV;"
+            "varying   vec2 _outUVY;"
+            "varying   vec2 _outUVU;"
+            "varying   vec2 _outUVV;"
+
+            "void main()"
+            "{"
+            "   _outUVY  =   _uvY;"
+            "   _outUVU  =   _uvU;"
+            "   _outUVV  =   _uvV;"
+            "   vec4    pos =   vec4(_position,0,1);"
+            "   gl_Position =   _MVP * pos;"
+            "}"
+        };
+        const char* ps =
+        {
+            "precision  lowp float; "
+            "uniform    sampler2D   _textureYUV;"
+            "uniform    sampler2D   _textureRGB;"
+            "uniform    float       _contrl;"
+
+            "varying    vec2    _outUVY;"
+            "varying    vec2    _outUVU;"
+            "varying    vec2    _outUVV;"
+            "void main()"
+            "{"
+            "   vec3    yuv;"
+            "   vec3    rgb;  "
+            "   vec3    oColor;"
+            "   yuv.x   =   texture2D(_textureYUV, _outUVY).a;"
+
+            "   yuv.y   =   texture2D(_textureYUV, _outUVU).a - 0.5;"
+            "   yuv.z   =   texture2D(_textureYUV, _outUVV).a - 0.5;"
+            "   rgb     =   mat3(   1,       1,         1,"
+            "                       0,       -0.39465,  2.03210,"
+            "                       1.13983, -0.58060,  0) * yuv;"
+            "   vec3    color1  =   texture2D(_textureRGB, _outUVY).rgb;"
+            "   oColor    =   color1 * _contrl + rgb * (1-_contrl);"
+
+            "   gl_FragColor = vec4(oColor, 1);"
+            "}"
+        };
+
+        bool    res = createProgram(vs, ps);
+        if (res)
+        {
+            _position = glGetAttribLocation(_programId, "_position");
+            _uvY = glGetAttribLocation(_programId, "_uvY");
+            _uvU = glGetAttribLocation(_programId, "_uvU");
+            _uvV = glGetAttribLocation(_programId, "_uvV");
+            _textureYUV = glGetUniformLocation(_programId, "_textureYUV");
+            _textureRGB = glGetUniformLocation(_programId, "_textureRGB");
+            _contrl = glGetUniformLocation(_programId, "_contrl");
+            _MVP = glGetUniformLocation(_programId, "_MVP");
+        }
+        return  res;
+    }
+
+    /**
+    *   ʹ�ó���
+    */
+    virtual void    begin()
+    {
+        glUseProgram(_programId);
+        glEnableVertexAttribArray(_position);
+        glEnableVertexAttribArray(_uvY);
+        glEnableVertexAttribArray(_uvU);
+        glEnableVertexAttribArray(_uvV);
+
+    }
+    /**
+    *   ʹ�����
+    */
+    virtual void    end()
+    {
+        glDisableVertexAttribArray(_position);
+        glDisableVertexAttribArray(_uvY);
+        glDisableVertexAttribArray(_uvU);
+        glDisableVertexAttribArray(_uvV);
+        glUseProgram(0);
+    }
+};
+

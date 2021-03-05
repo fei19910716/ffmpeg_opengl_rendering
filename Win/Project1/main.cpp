@@ -13,8 +13,18 @@
 #include "GLContext.h"
 #include "CELLShader.h"
 #include "CELLMath.h"
+#include "FreeImage.h"
 
-
+// get the path of .exe
+void  getResourcePath(HINSTANCE hInstance, char pPath[1024])
+{
+    char    szPathName[1024];
+    char    szDriver[64];
+    char    szPath[1024];
+    GetModuleFileNameA(hInstance, szPathName, sizeof(szPathName));
+    _splitpath(szPathName, szDriver, szPath, 0, 0);
+    sprintf(pPath, "%s%s", szDriver, szPath);
+}
 
 HBITMAP         g_hBmp = 0;
 HDC             g_hMem = 0;
@@ -32,7 +42,10 @@ public:
     Timestamp       _timestamp;
     GLContext       _glContext;
     unsigned        _textureYUV;
-    PROGRAM_YUV_SingleTexture     _shaderTex;
+    unsigned        _textureRGB;
+    float           _contrl;
+    bool            _flags;
+    PROGRAM_YUV1_RGB    _shaderTex;
     unsigned        _pbo[2];
     int             _DMA;
     int             _WRITE;
@@ -45,9 +58,11 @@ public:
         _DMA = 0;
         _WRITE = 1;
         _dmaPtr = 0;
+        _contrl = 0;
+        _flags = false;
     }
 
-    virtual void    setup(HWND hwnd, const char* fileName = "11.flv")
+    virtual void    setup(HWND hwnd, const char* fileName)
     {
         _hWnd = hwnd;
         
@@ -56,11 +71,17 @@ public:
         glewInit();
 
         glEnable(GL_TEXTURE_2D);
-        // 创建单通道纹理，由于UV长宽是原图的一半，因此拼接起来的纹理尺寸为w，h+h/2
-        _textureYUV = createTexture(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2); 
 
-        _pbo[0] = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
-        _pbo[1] = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
+        _textureYUV = createTexture(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
+
+        char    szPath[1024];
+        char    szPathName[1024];
+
+        getResourcePath(0, szPath);
+
+        sprintf(szPathName, "test.bmp", szPath);
+
+        _textureRGB = createTextureFromImage(szPathName);
 
         _shaderTex.initialize();
 
@@ -218,11 +239,39 @@ public:
             CELL::float2(x + w, y + h),          CELL::float2(1,Yv),                  CELL::float2(Uu1,Uv1),     CELL::float2(Vu1,Vv1),
         };
 
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, _textureYUV);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, _textureRGB);
+
         CELL::matrix4   matMVP = CELL::ortho<float>(0, w, h, 0, -100, 100);
         _shaderTex.begin();
         glUniformMatrix4fv(_shaderTex._MVP, 1, GL_FALSE, matMVP.data());
 
+
+        if (_flags)
+        {
+            _contrl += 1 / 100.0f;
+            if (_contrl >= 1.0f)
+            {
+                _flags = false;
+            }
+        }
+        else
+        {
+            _contrl -= 1 / 100.0f;
+            if (_contrl <= 0.0f)
+            {
+                _flags = true;
+            }
+        }
+
         glUniform1i(_shaderTex._textureYUV, 0);
+        glUniform1i(_shaderTex._textureRGB, 1);
+        glUniform1f(_shaderTex._contrl, _contrl);
+
+
         glVertexAttribPointer(_shaderTex._position, 2, GL_FLOAT, false, sizeof(Vertex), vertex);
         glVertexAttribPointer(_shaderTex._uvY,      2, GL_FLOAT, false, sizeof(Vertex), &vertex[0].uvY); // 
         glVertexAttribPointer(_shaderTex._uvU,      2, GL_FLOAT, false, sizeof(Vertex), &vertex[0].uvU);
@@ -235,14 +284,48 @@ public:
 
 protected:
 
-    unsigned    createTexture(int w, int h)
+    unsigned    createTextureFromImage(const char* fileName)
+    {
+        //1 ��ȡͼƬ��ʽ
+        FREE_IMAGE_FORMAT fifmt = FreeImage_GetFileType(fileName, 0);
+        if (fifmt == FIF_UNKNOWN)
+        {
+            return  0;
+        }
+        //2 ����ͼƬ
+        FIBITMAP* dib = FreeImage_Load(fifmt, fileName, 0);
+
+        FREE_IMAGE_COLOR_TYPE type = FreeImage_GetColorType(dib);
+
+        //! ��ȡ����ָ��
+        FIBITMAP* temp = dib;
+        dib = FreeImage_ConvertTo32Bits(dib);
+        FreeImage_Unload(temp);
+
+        BYTE* pixels = (BYTE*)FreeImage_GetBits(dib);
+        int     width = FreeImage_GetWidth(dib);
+        int     height = FreeImage_GetHeight(dib);
+
+        for (int i = 0; i < width * height * 4; i += 4)
+        {
+            BYTE temp = pixels[i];
+            pixels[i] = pixels[i + 2];
+            pixels[i + 2] = temp;
+        }
+
+        unsigned    res = createTexture(width, height, GL_RGB, pixels);
+        FreeImage_Unload(dib);
+        return      res;
+    }
+
+    unsigned    createTexture(int w, int h, unsigned fmt = GL_ALPHA, const void* data = 0)
     {
         unsigned    texId;
         glGenTextures(1, &texId);
         glBindTexture(GL_TEXTURE_2D, texId);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, w, h, 0, GL_ALPHA, GL_UNSIGNED_BYTE, 0); // GL_ALPHA单通道的三张纹理
+        glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, data);
 
         return  texId;
     }
@@ -295,16 +378,6 @@ LRESULT CALLBACK    windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
     }
 
     return  DefWindowProc(hWnd, msg, wParam, lParam);
-}
-// get the path of .exe
-void  getResourcePath(HINSTANCE hInstance, char pPath[1024])
-{
-    char    szPathName[1024];
-    char    szDriver[64];
-    char    szPath[1024];
-    GetModuleFileNameA(hInstance, szPathName, sizeof(szPathName));
-    _splitpath(szPathName, szDriver, szPath, 0, 0);
-    sprintf(pPath, "%s%s", szDriver, szPath);
 }
 
 int     WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
