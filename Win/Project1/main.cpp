@@ -17,7 +17,7 @@
 
 HBITMAP         g_hBmp = 0;
 HDC             g_hMem = 0;
-BYTE* g_imageBuf = 0;
+BYTE*           g_imageBuf = 0;
 FFVideoReader   g_reader;
 
 class   DecodeThread :public Thread
@@ -29,10 +29,8 @@ public:
     bool            _exitFlag;
     Timestamp       _timestamp;
     GLContext       _glContext;
-    unsigned        _textureY; // 存储YUV的三张纹理，送入GPU进行到RGB的转化
-    unsigned        _textureU;
-    unsigned        _textureV;
-    PROGRAM_YUV     _shaderTex;
+    unsigned        _textureYUV;
+    PROGRAM_YUV_SingleTexture     _shaderTex;
 public:
     DecodeThread()
     {
@@ -49,12 +47,8 @@ public:
         glewInit();
 
         glEnable(GL_TEXTURE_2D);
-
-        _textureY = createTexture(_ffReader._screenW, _ffReader._screenH); // 创建三张单通道的纹理
-
-        _textureU = createTexture(_ffReader._screenW / 2, _ffReader._screenH / 2); // UV只需要0.25的内存大小
-
-        _textureV = createTexture(_ffReader._screenW / 2, _ffReader._screenH / 2);
+        // 创建单通道纹理，由于UV长宽是原图的一半，因此拼接起来的纹理尺寸为w，h+h/2
+        _textureYUV = createTexture(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2); 
 
         _shaderTex.initialize();
 
@@ -105,23 +99,26 @@ public:
 
     void    updateTexture(FrameInfor* infor)
     {
-        glBindTexture(GL_TEXTURE_2D, _textureY);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW, _ffReader._screenH, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[0]); // GL_ALPHA 通道
+        glBindTexture(GL_TEXTURE_2D, _textureYUV); // 执行cpu 到 gpu的纹理数据拷贝
 
-        glBindTexture(GL_TEXTURE_2D, _textureU);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[1]);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW, _ffReader._screenH, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[0]);
 
-        glBindTexture(GL_TEXTURE_2D, _textureV);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[2]);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[1]);
+
+        glTexSubImage2D(GL_TEXTURE_2D, 0, _ffReader._screenW / 2, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[2]);
+
 
     }
 
     void    render()
     {
+        // 顶点数据
         struct  Vertex
         {
-            float   x, y;
-            float   u, v;
+            CELL::float2  pos; // 位置
+            CELL::float2  uvY; // Y的采样坐标
+            CELL::float2  uvU;
+            CELL::float2  uvV;
         };
 
         RECT    rt;
@@ -141,39 +138,47 @@ public:
         glLoadIdentity();
 
 
-        glActiveTexture(GL_TEXTURE0); // 绑定三张纹理
-        glBindTexture(GL_TEXTURE_2D, _textureY);
+        glBindTexture(GL_TEXTURE_2D, _textureYUV);
 
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, _textureU);
+        float   yv = (float)_ffReader._screenH / (float)(_ffReader._screenH + _ffReader._screenH / 2);
 
+        float   fw = _ffReader._screenW;
+        float   fh = _ffReader._screenH;
 
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, _textureV);
+        float   x = 0;
+        float   y = 0;
 
-        Vertex  vertexs[] =
+        float   Yv = (float)fh / (float)(fh + fh / 2);
+
+        float   Uu0 = 0;
+        float   Uv0 = Yv;
+        float   Uu1 = 0.5f;
+        float   Uv1 = 1.0f;
+
+        float   Vu0 = 0.5f; // V的数据左上角的顶点在整张图中的坐标为（0.5，Yv）
+        float   Vv0 = Yv;
+        float   Vu1 = 1.0f;
+        float   Vv1 = 1.0f;
+        // 基于新的尺寸为w,h+h/2的一张纹理计算采样坐标
+        Vertex  vertex[] =
         {
-            {   0,  0,  0,  0},
-            {   0,  h,  0,  1},
-            {   w,  0,  1,  0},
-
-            {   0,  h,  0,  1},
-            {   w,  0,  1,  0},
-            {   w,  h,  1,  1},
+            // 第一个点是纹理左上角
+            CELL::float2(x,y),/*位置*/           CELL::float2(0,0),/*Y的采样uv*/      CELL::float2(Uu0,Uv0),     CELL::float2(Vu0,Vv0),
+            CELL::float2(x + w,y),               CELL::float2(1,0),                   CELL::float2(Uu1,Uv0),     CELL::float2(Vu1,Vv0),
+            CELL::float2(x,y + h),               CELL::float2(0,Yv),                  CELL::float2(Uu0,Uv1),     CELL::float2(Vu0,Vv1),
+            CELL::float2(x + w, y + h),          CELL::float2(1,Yv),                  CELL::float2(Uu1,Uv1),     CELL::float2(Vu1,Vv1),
         };
 
         CELL::matrix4   matMVP = CELL::ortho<float>(0, w, h, 0, -100, 100);
         _shaderTex.begin();
         glUniformMatrix4fv(_shaderTex._MVP, 1, GL_FALSE, matMVP.data());
 
-        glUniform1i(_shaderTex._textureY, 0); // 设置纹理单元
-        glUniform1i(_shaderTex._textureU, 1);
-        glUniform1i(_shaderTex._textureV, 2);
-        {
-            glVertexAttribPointer(_shaderTex._position, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), &vertexs[0].x);
-            glVertexAttribPointer(_shaderTex._uv, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), &vertexs[0].u);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
+        glUniform1i(_shaderTex._textureYUV, 0);
+        glVertexAttribPointer(_shaderTex._position, 2, GL_FLOAT, false, sizeof(Vertex), vertex);
+        glVertexAttribPointer(_shaderTex._uvY,      2, GL_FLOAT, false, sizeof(Vertex), &vertex[0].uvY); // 
+        glVertexAttribPointer(_shaderTex._uvU,      2, GL_FLOAT, false, sizeof(Vertex), &vertex[0].uvU);
+        glVertexAttribPointer(_shaderTex._uvV,      2, GL_FLOAT, false, sizeof(Vertex), &vertex[0].uvV);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         _shaderTex.end();
 
         _glContext.swapBuffer();

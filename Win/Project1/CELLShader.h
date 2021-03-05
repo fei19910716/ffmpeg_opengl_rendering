@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "glew/glew.h"
 #include <assert.h>
@@ -16,7 +16,7 @@ public:
 
 
 /**
-*   ³ÌĞò
+*   ç¨‹åº
 */
 class   ProgramId
 {
@@ -31,7 +31,7 @@ public:
     }
 public:
     /**
-    *   ¼ÓÔØº¯Êı
+    *   åŠ è½½å‡½æ•°
     */
     bool    createProgram( const char* vertex,const char* fragment )
     {
@@ -120,7 +120,7 @@ public:
     }
 
     /**
-    *   Ê¹ÓÃ³ÌĞò
+    *   ä½¿ç”¨ç¨‹åº
     */
     virtual void    begin()
     {
@@ -128,7 +128,7 @@ public:
         
     }
     /**
-    *   Ê¹ÓÃÍê³É
+    *   ä½¿ç”¨å®Œæˆ
     */
     virtual void    end()
     {
@@ -165,7 +165,7 @@ public:
     {
     }
    
-    /// ³õÊ¼»¯º¯Êı
+    /// åˆå§‹åŒ–å‡½æ•°
     virtual bool    initialize()
     {
         const char* vs  =   
@@ -207,7 +207,7 @@ public:
     }
 
     /**
-    *   Ê¹ÓÃ³ÌĞò
+    *   ä½¿ç”¨ç¨‹åº
     */
     virtual void    begin()
     {
@@ -217,7 +217,7 @@ public:
         
     }
     /**
-    *   Ê¹ÓÃÍê³É
+    *   ä½¿ç”¨å®Œæˆ
     */
     virtual void    end()
     {
@@ -256,7 +256,7 @@ public:
     {
     }
    
-    /// ³õÊ¼»¯º¯Êı
+    /// åˆå§‹åŒ–å‡½æ•°
     virtual bool    initialize()
     {
         const char* vs  =   
@@ -309,7 +309,7 @@ public:
     }
 
     /**
-    *   Ê¹ÓÃ³ÌĞò
+    *   ä½¿ç”¨ç¨‹åº
     */
     virtual void    begin()
     {
@@ -319,12 +319,122 @@ public:
         
     }
     /**
-    *   Ê¹ÓÃÍê³É
+    *   ä½¿ç”¨å®Œæˆ
     */
     virtual void    end()
     {
         glDisableVertexAttribArray(_position);
         glDisableVertexAttribArray(_uv);
+        glUseProgram(0);
+    }
+};
+
+// YUVä½¿ç”¨ä¸€å¼ çº¹ç†è¿›è¡Œå­˜å‚¨
+class   PROGRAM_YUV_SingleTexture :public ProgramId
+{
+public:
+    typedef int attribute;
+    typedef int uniform;
+public:
+    attribute   _position;
+    attribute   _uvY; // é‡‡æ ·Yçš„åæ ‡
+    attribute   _uvU; // é‡‡æ ·Uçš„åæ ‡
+    attribute   _uvV; // é‡‡æ ·Vçš„åæ ‡
+    uniform     _MVP;
+    uniform     _textureYUV; // çº¹ç†
+public:
+    PROGRAM_YUV_SingleTexture()
+    {
+        _position = -1;
+        _uvY = -1;
+        _uvU = -1;
+        _uvV = -1;
+        _MVP = -1;
+        _textureYUV = -1;
+    }
+    ~PROGRAM_YUV_SingleTexture()
+    {
+    }
+
+    /// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    virtual bool    initialize()
+    {
+        const char* vs =
+        {
+            "precision lowp float; "
+            "uniform   mat4 _MVP;"
+            "attribute vec2 _position;"
+            "attribute vec2 _uvY;"
+            "attribute vec2 _uvU;"
+            "attribute vec2 _uvV;"
+            "varying   vec2 _outUVY;"
+            "varying   vec2 _outUVU;"
+            "varying   vec2 _outUVV;"
+
+            "void main()"
+            "{"
+            "   _outUVY  =   _uvY;"
+            "   _outUVU  =   _uvU;"
+            "   _outUVV  =   _uvV;"
+            "   vec4    pos =   vec4(_position,0,1);"
+            "   gl_Position =   _MVP * pos;"
+            "}"
+        };
+        const char* ps =
+        {
+            "precision  lowp float; "
+            "uniform    sampler2D   _textureYUV;"
+            "varying    vec2    _outUVY;"
+            "varying    vec2    _outUVU;"
+            "varying    vec2    _outUVV;"
+            "void main()"
+            "{"
+            "   vec3    yuv;"
+            "   vec3    rgb;  "
+            "   yuv.x   =   texture2D(_textureYUV, _outUVY).a;"
+            "   yuv.y   =   texture2D(_textureYUV, _outUVU).a - 0.5;"
+            "   yuv.z   =   texture2D(_textureYUV, _outUVV).a - 0.5;"
+            "   rgb     =   mat3(   1,       1,         1,"
+            "                       0,       -0.39465,  2.03210,"
+            "                       1.13983, -0.58060,  0) * yuv;"
+            "   gl_FragColor = vec4(rgb, 1);"
+            "}"
+        };
+
+        bool    res = createProgram(vs, ps);
+        if (res)
+        {
+            _position = glGetAttribLocation(_programId, "_position");
+            _uvY = glGetAttribLocation(_programId, "_uvY");
+            _uvU = glGetAttribLocation(_programId, "_uvU");
+            _uvV = glGetAttribLocation(_programId, "_uvV");
+            _textureYUV = glGetUniformLocation(_programId, "_textureYUV");
+            _MVP = glGetUniformLocation(_programId, "_MVP");
+        }
+        return  res;
+    }
+
+    /**
+    *   Ê¹ï¿½Ã³ï¿½ï¿½ï¿½
+    */
+    virtual void    begin()
+    {
+        glUseProgram(_programId);
+        glEnableVertexAttribArray(_position);
+        glEnableVertexAttribArray(_uvY);
+        glEnableVertexAttribArray(_uvU);
+        glEnableVertexAttribArray(_uvV);
+
+    }
+    /**
+    *   Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½
+    */
+    virtual void    end()
+    {
+        glDisableVertexAttribArray(_position);
+        glDisableVertexAttribArray(_uvY);
+        glDisableVertexAttribArray(_uvU);
+        glDisableVertexAttribArray(_uvV);
         glUseProgram(0);
     }
 };
