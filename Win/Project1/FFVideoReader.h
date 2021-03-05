@@ -14,7 +14,7 @@ extern "C"
 // 封装一帧数据
 struct  FrameInfor
 {
-    void*   _data;
+    AVFrame* _data;
     int     _dataSize;
     int     _width;
     int     _height;
@@ -29,10 +29,8 @@ public:
     AVFormatContext* _formatCtx;
     int             _videoIndex;
     AVCodecContext* _codecCtx;
-    AVCodec* _codec;
-    AVFrame* _frame;
-    AVFrame* _frameRGB;
-    SwsContext* _convertCtx;
+    AVCodec*        _codec;
+    AVFrame*        _frame;
 public:
     int             _screenW;
     int             _screenH;
@@ -46,8 +44,6 @@ public:
         _codecCtx = 0;
         _codec = 0;
         _frame = 0;
-        _frameRGB = 0;
-        _convertCtx = 0;
         _screenW = 0;
         _screenH = 0;
 
@@ -55,8 +51,6 @@ public:
 
     ~FFVideoReader()
     {
-        sws_freeContext(_convertCtx);
-        av_free(_frameRGB);
         av_free(_frame);
         avcodec_close(_codecCtx);
         avformat_close_input(&_formatCtx);
@@ -115,76 +109,13 @@ public:
         }
         // 分配数据帧内存
         _frame = av_frame_alloc();
-        _frameRGB = av_frame_alloc();
 
         _screenW = _codecCtx->width;
         _screenH = _codecCtx->height;
 
-        // 转换context，比如窗口大小改变时，数据帧需要进行转换
-        _convertCtx = sws_getContext(
-            _codecCtx->width
-            , _codecCtx->height
-            , _codecCtx->pix_fmt
-            , _codecCtx->width // 转换后的width
-            , _codecCtx->height
-            , AV_PIX_FMT_RGB24 // 转换后的format
-            , SWS_BICUBIC
-            , NULL
-            , NULL
-            , NULL
-        );
-        // 计算当前帧的内存大小
-        int     numBytes = avpicture_get_size(AV_PIX_FMT_RGB24, _codecCtx->width, _codecCtx->height);
-        uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
-        avpicture_fill((AVPicture*)_frameRGB, buffer, AV_PIX_FMT_RGB24, _codecCtx->width, _codecCtx->height);
-        _imageSize = numBytes;
         return  0;
     }
-    // 读取视频帧
-    void* readFrame()
-    {
-        // 加密的数据包
-        AVPacket packet;
-        av_init_packet(&packet);
-        for (;;)
-        {
-            // 读取数据包
-            if (av_read_frame(_formatCtx, &packet))
-            {
-                av_free_packet(&packet);
-                return 0;
-            }
-            if (packet.stream_index != _videoIndex)
-            {
-                continue;
-            }
-            int frame_finished = 0;
-            // 进行数据包解密，存储在_frame中
-            int res = avcodec_decode_video2(_codecCtx, _frame, &frame_finished, &packet);
-
-            // 图像帧可能由多帧数据帧构成，当图像帧完整时进行处理
-            if (frame_finished)
-            {
-
-                char    buf[128];
-                sprintf(buf, "pts = %I64d     dts =  %I64d\n", packet.pts, packet.dts);
-                // 进行format的转换
-                int res = sws_scale(
-                    _convertCtx
-                    , (const uint8_t* const*)_frame->data
-                    , _frame->linesize
-                    , 0
-                    , _codecCtx->height
-                    , _frameRGB->data
-                    , _frameRGB->linesize
-                );
-                av_packet_unref(&packet);
-
-                return  _frameRGB->data[0]; // 返回解密后的图像帧数据
-            }
-        }
-        return  0;
-    }
+    
     // 读取一帧信息到frameInfo中
     bool    readFrame(FrameInfor& infor)
     {
@@ -212,21 +143,10 @@ public:
                 int64_t     pts = _frame->pts;
 
 
-
-                char        buf[128];
-                sprintf(buf, "pts = %I64d     dts =  %I64d\n", packet.pts, packet.dts);
-                int res = sws_scale(
-                    _convertCtx
-                    , (const uint8_t* const*)_frame->data
-                    , _frame->linesize
-                    , 0
-                    , _codecCtx->height
-                    , _frameRGB->data
-                    , _frameRGB->linesize
-                );
+                // CPU进行YUV到RGB的转化，可以转到GPU中进行提升性能
                 av_packet_unref(&packet);
 
-                infor._data = _frameRGB->data[0];
+                infor._data = _frame;
                 infor._dataSize = _imageSize;
                 infor._width = _screenW;
                 infor._height = _screenH;

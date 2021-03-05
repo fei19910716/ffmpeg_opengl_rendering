@@ -29,8 +29,10 @@ public:
     bool            _exitFlag;
     Timestamp       _timestamp;
     GLContext       _glContext;
-    unsigned        _textureId;
-    PROGRAM_P2_UV2  _shaderTex;
+    unsigned        _textureY; // 存储YUV的三张纹理，送入GPU进行到RGB的转化
+    unsigned        _textureU;
+    unsigned        _textureV;
+    PROGRAM_YUV     _shaderTex;
 public:
     DecodeThread()
     {
@@ -48,7 +50,11 @@ public:
 
         glEnable(GL_TEXTURE_2D);
 
-        _textureId = createTexture(_ffReader._screenW, _ffReader._screenH);
+        _textureY = createTexture(_ffReader._screenW, _ffReader._screenH); // 创建三张单通道的纹理
+
+        _textureU = createTexture(_ffReader._screenW / 2, _ffReader._screenH / 2); // UV只需要0.25的内存大小
+
+        _textureV = createTexture(_ffReader._screenW / 2, _ffReader._screenH / 2);
 
         _shaderTex.initialize();
 
@@ -99,8 +105,15 @@ public:
 
     void    updateTexture(FrameInfor* infor)
     {
-        glBindTexture(GL_TEXTURE_2D, _textureId);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW, _ffReader._screenH, GL_RGB, GL_UNSIGNED_BYTE, infor->_data);
+        glBindTexture(GL_TEXTURE_2D, _textureY);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW, _ffReader._screenH, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[0]); // GL_ALPHA 通道
+
+        glBindTexture(GL_TEXTURE_2D, _textureU);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[1]);
+
+        glBindTexture(GL_TEXTURE_2D, _textureV);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _ffReader._screenW / 2, _ffReader._screenH / 2, GL_ALPHA, GL_UNSIGNED_BYTE, infor->_data->data[2]);
+
     }
 
     void    render()
@@ -128,7 +141,15 @@ public:
         glLoadIdentity();
 
 
-        glBindTexture(GL_TEXTURE_2D, _textureId);
+        glActiveTexture(GL_TEXTURE0); // 绑定三张纹理
+        glBindTexture(GL_TEXTURE_2D, _textureY);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, _textureU);
+
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, _textureV);
 
         Vertex  vertexs[] =
         {
@@ -145,7 +166,9 @@ public:
         _shaderTex.begin();
         glUniformMatrix4fv(_shaderTex._MVP, 1, GL_FALSE, matMVP.data());
 
-        glUniform1i(_shaderTex._texture, 0);
+        glUniform1i(_shaderTex._textureY, 0); // 设置纹理单元
+        glUniform1i(_shaderTex._textureU, 1);
+        glUniform1i(_shaderTex._textureV, 2);
         {
             glVertexAttribPointer(_shaderTex._position, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), &vertexs[0].x);
             glVertexAttribPointer(_shaderTex._uv, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), &vertexs[0].u);
@@ -165,7 +188,7 @@ protected:
         glBindTexture(GL_TEXTURE_2D, texId);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, w, h, 0, GL_ALPHA, GL_UNSIGNED_BYTE, 0); // GL_ALPHA单通道的三张纹理
 
         return  texId;
     }
