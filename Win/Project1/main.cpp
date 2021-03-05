@@ -30,13 +30,18 @@ public:
     GLContext       _glContext;
     unsigned        _textureYUV;
     PROGRAM_YUV_SingleTexture     _shaderTex;
-    unsigned        _pbo;
+    unsigned        _pbo[2];
+    int             _DMA;
+    int             _WRITE;
+    void*           _dmaPtr;
 public:
     DecodeThread()
     {
         _exitFlag = false;
         _hWnd = 0;
-        _pbo = 0;
+        _DMA = 0;
+        _WRITE = 1;
+        _dmaPtr = 0;
     }
 
     virtual void    setup(HWND hwnd, const char* fileName = "11.flv")
@@ -51,7 +56,8 @@ public:
         // 创建单通道纹理，由于UV长宽是原图的一半，因此拼接起来的纹理尺寸为w，h+h/2
         _textureYUV = createTexture(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2); 
 
-        _pbo = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
+        _pbo[0] = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
+        _pbo[1] = createPBuffer(_ffReader._screenW, _ffReader._screenH + _ffReader._screenH / 2);
 
         _shaderTex.initialize();
 
@@ -86,6 +92,13 @@ public:
             double      tims = infor->_pts * infor->_timeBase * 1000;
             //! ������Ҫ֪ͨ���ڽ����ػ��Ƹ��£���ʾ��������
 
+            if (infor->_data->data[0] == 0
+                || infor->_data->data[1] == 0
+                || infor->_data->data[2] == 0)
+            {
+                continue;
+            }
+
             PostMessage(_hWnd, WM_UPDATE_VIDEO, (WPARAM)infor, 0);
 
 
@@ -102,9 +115,9 @@ public:
 
     void    updateImage(GLubyte* dst, int x, int y, int w, int h, void* data)
     {
-        int      pitch = _ffReader._screenW;
-        GLubyte*  dst1 = dst + y * pitch + x;
-        GLubyte*   src = (GLubyte*)(data);
+        int         pitch = _ffReader._screenW;
+        GLubyte*    dst1 = dst + y * pitch + x;
+        GLubyte*     src = (GLubyte*)(data);
 
         int         size = w;
 
@@ -121,25 +134,22 @@ public:
         int     w = _ffReader._screenW;
         int     h = _ffReader._screenH + _ffReader._screenH / 2;
 
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo); // 绑定pbo
-        GLubyte* dst = (GLubyte*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY); // 获取pbo 内存指针
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo[_WRITE]); // 内存交换时拷贝到write pbo
+        GLubyte* dst = (GLubyte*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 
-        if (dst != 0) // 内存中进行纹理数据拷贝到pbo中
+        if (dst != 0)
         {
             memcpy(dst, infor->_data->data[0], _ffReader._screenW * _ffReader._screenH);
 
             updateImage(dst, 0, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, infor->_data->data[1]);
             updateImage(dst, _ffReader._screenW / 2, _ffReader._screenH, _ffReader._screenW / 2, _ffReader._screenH / 2, infor->_data->data[2]);
-
             glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         }
-
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _pbo[_DMA]); // 显存交换时，拷贝dma pbo
         glBindTexture(GL_TEXTURE_2D, _textureYUV);
-
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_ALPHA, GL_UNSIGNED_BYTE, 0); // pbo 中的数据拷贝到显存
-
-
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_ALPHA, GL_UNSIGNED_BYTE, 0);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        std::swap(_DMA, _WRITE); // 不断交替进行
 
     }
 
